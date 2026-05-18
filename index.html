@@ -136,7 +136,7 @@
         // Cambiar a ruta relativa para Vercel
         const API_BASE_URL = "/api/v1";
 
-        // Función reutilizable para pedir datos al Backend
+        // Función para pedir datos al Backend
         async function fetchEmpresas(queryParam = "") {
             const searchError = document.getElementById('searchError');
             const resultsTableBody = document.getElementById('resultsTableBody');
@@ -144,14 +144,22 @@
             
             try {
                 let url = `${API_BASE_URL}/buscar`;
-                if(queryParam.strip !== "") {
-                    url += `?query=${encodeURIComponent(queryParam)}`;
+                if(queryParam.trim() !== "") {
+                    url += `?query=${encodeURIComponent(queryParam.trim())}`;
                 }
                 
                 const response = await fetch(url);
                 if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.detail || "No se encontraron coincidencias.");
+                    let mensajeError = "Error en la base de datos.";
+                    const contentType = response.headers.get("content-type");
+                    
+                    if (contentType && contentType.includes("application/json")) {
+                        const errData = await response.json();
+                        mensajeError = errData.detail || mensajeError;
+                    } else {
+                        mensajeError = await response.text(); 
+                    }
+                    throw new Error(mensajeError);
                 }
                 
                 const data = await response.json();
@@ -274,7 +282,7 @@
 
         // CARGA AUTOMÁTICA AL ABRIR LA WEB
         window.addEventListener('DOMContentLoaded', () => {
-            fetchEmpresas(''); // Solicita la lista completa desde el primer instante
+            fetchEmpresas(''); 
         });
     </script>
 </body>
