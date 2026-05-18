@@ -42,10 +42,28 @@ def normalizar_texto_espaciado(texto: str) -> str:
     return texto_str.strip().upper()
 
 def load_and_merge_datasets():
-    # Carga de datos registrales de los 3 años
-    reg_2024 = pd.read_csv("operaciones_registrales_2024.xlsx - Operaciones registrales 2024.csv")
-    reg_2025 = pd.read_csv("operaciones_registrales_2025.xlsx - data.csv")
-    reg_2026 = pd.read_csv("operaciones_registrales_2026.xlsx - data.csv")
+    # 1. Obtener la carpeta raíz donde reside este archivo main.py
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    
+    # 2. Construir rutas absolutas seguras para cada CSV
+    path_2024 = os.path.join(BASE_DIR, "operaciones_registrales_2024.xlsx - Operaciones registrales 2024.csv")
+    path_2025 = os.path.join(BASE_DIR, "operaciones_registrales_2025.xlsx - data.csv")
+    path_2026 = os.path.join(BASE_DIR, "operaciones_registrales_2026.xlsx - data.csv")
+    path_top = os.path.join(BASE_DIR, "TOP102026_05_17_20_22_06.csv.csv")
+
+    # 3. Validar si los archivos realmente existen antes de leerlos (evita el crash de Vercel)
+    for p in [path_2024, path_2025, path_2026]:
+        if not os.path.exists(p):
+            # Esto devolverá un JSON limpio manejado por FastAPI en vez de un quiebre 500
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Error crítico: Archivo ausente en el despliegue -> {os.path.basename(p)}"
+            )
+
+    # 4. Leer los archivos con su ruta absoluta segura
+    reg_2024 = pd.read_csv(path_2024)
+    reg_2025 = pd.read_csv(path_2025)
+    reg_2026 = pd.read_csv(path_2026)
     
     reg_2024['ANIO_REGISTRO'] = 2024
     reg_2025['ANIO_REGISTRO'] = 2025
@@ -56,17 +74,19 @@ def load_and_merge_datasets():
     registros['NOMBRE_PROVEEDOR'] = registros['NOMBRE_PROVEEDOR'].astype(str).str.strip().str.upper()
 
     try:
-        top_financial = pd.read_csv("TOP102026_05_17_20_22_06.csv.csv")
-        top_financial.columns = [re.sub(r'\s+', '', col) for col in top_financial.columns]
-        top_financial['NIT'] = top_financial['NIT'].astype(str).str.replace(" ", "").str.upper()
-        top_financial['NOMBRE'] = top_financial['NOMBRE'].apply(normalizar_texto_espaciado)
-        top_financial['MONTO'] = pd.to_numeric(top_financial['MONTO'].astype(str).str.replace(" ", ""), errors='coerce').fillna(0.0)
-        top_financial['CANTIDAD'] = pd.to_numeric(top_financial['CANTIDAD'].astype(str).str.replace(" ", ""), errors='coerce').fillna(0).astype(int)
+        if os.path.exists(path_top):
+            top_financial = pd.read_csv(path_top)
+            top_financial.columns = [re.sub(r'\s+', '', col) for col in top_financial.columns]
+            top_financial['NIT'] = top_financial['NIT'].astype(str).str.replace(" ", "").str.upper()
+            top_financial['NOMBRE'] = top_financial['NOMBRE'].apply(normalizar_texto_espaciado)
+            top_financial['MONTO'] = pd.to_numeric(top_financial['MONTO'].astype(str).str.replace(" ", ""), errors='coerce').fillna(0.0)
+            top_financial['CANTIDAD'] = pd.to_numeric(top_financial['CANTIDAD'].astype(str).str.replace(" ", ""), errors='coerce').fillna(0).astype(int)
+        else:
+            top_financial = pd.DataFrame(columns=['NIT', 'NOMBRE', 'CANTIDAD', 'MONTO'])
     except Exception:
         top_financial = pd.DataFrame(columns=['NIT', 'NOMBRE', 'CANTIDAD', 'MONTO'])
 
     return registros, top_financial
-
 # --- MODELOS DE DATOS ---
 class EmpresaSearchResult(BaseModel):
     nit: str
