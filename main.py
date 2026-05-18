@@ -3,15 +3,15 @@ import re
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse  # <-- IMPORTANTE: Para servir el HTML
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
 
 app = FastAPI(
     title="Anti-Shell Company Analytics Backend",
-    description="API para la detección y análisis de riesgo de empresas de cartón con motor de búsqueda.",
-    version="1.2.0"
+    description="API para la detección y análisis de riesgo de empresas de cartón con catálogo completo y buscador flexible.",
+    version="1.3.0"
 )
 
 # --- CONFIGURACIÓN DE CORS ---
@@ -26,13 +26,9 @@ app.add_middleware(
 # --- RUTA PARA SERVIR EL FRONTEND (index.html) ---
 @app.get("/")
 def obtener_frontend():
-    """
-    Sirve el archivo index.html en la raíz del sitio.
-    """
-    # Verificamos si el archivo existe antes de enviarlo
     if os.path.exists("index.html"):
         return FileResponse("index.html")
-    return {"error": "Archivo index.html no encontrado en el servidor. Asegúrate de haberlo subido en la raíz junto a main.py"}
+    return {"error": "Archivo index.html no encontrado en la raíz."}
 
 
 # --- FUNCIONES DE LIMPIEZA Y CARGA DE DATOS ---
@@ -46,7 +42,7 @@ def normalizar_texto_espaciado(texto: str) -> str:
     return texto_str.strip().upper()
 
 def load_and_merge_datasets():
-    # Rutas relativas para buscar los archivos subidos
+    # Carga de datos registrales de los 3 años
     reg_2024 = pd.read_csv("operaciones_registrales_2024.xlsx - Operaciones registrales 2024.csv")
     reg_2025 = pd.read_csv("operaciones_registrales_2025.xlsx - data.csv")
     reg_2026 = pd.read_csv("operaciones_registrales_2026.xlsx - data.csv")
@@ -91,44 +87,79 @@ class RiskAnalysisResponse(BaseModel):
     detalles_analisis: Dict[str, Any]
 
 # --- ENDPOINTS DE LA API ---
+
 @app.get("/api/v1/buscar", response_model=List[EmpresaSearchResult])
-def buscar_empresa(query: str = Query(..., min_length=3)):
+def buscar_empresa(query: Optional[str] = Query(None, description="NIT o Nombre parcial. Si se omite, lista todo.")):
+    """
+    Busca empresas por NIT o Nombre. Si el query está vacío o no se envía,
+    devuelve la lista completa de todas las empresas disponibles.
+    """
     registros, financieras = load_and_merge_datasets()
-    q_limpio = query.strip().upper()
-    q_sin_espacios = q_limpio.replace(" ", "")
     resultados_dict = {}
 
-    filtro_reg = registros[
-        (registros['NIT_PROVEEDOR'].str.contains(q_sin_espacios, na=False)) |
-        (registros['NOMBRE_PROVEEDOR'].str.contains(q_limpio, na=False))
-    ]
-    for _, row in filtro_reg.drop_duplicates(subset=['NIT_PROVEEDOR']).iterrows():
-        nit = row['NIT_PROVEEDOR']
-        resultados_dict[nit] = {
-            "nit": nit,
-            "nombre": row['NOMBRE_PROVEEDOR'],
-            "origen_dato": "Registro",
-            "tipo_proveedor": row['TIPO_PROVEEDOR']
-        }
+    # Caso 1: Búsqueda con filtro específico
+    if query and query.strip():
+        q_limpio = query.strip().upper()
+        q_sin_espacios = q_limpio.replace(" ", "")
 
-    filtro_fin = financieras[
-        (financieras['NIT'].str.contains(q_sin_espacios, na=False)) |
-        (financieras['NOMBRE'].str.contains(q_limpio, na=False))
-    ]
-    for _, row in filtro_fin.drop_duplicates(subset=['NIT']).iterrows():
-        nit = row['NIT']
-        if nit in resultados_dict:
-            resultados_dict[nit]["origen_dato"] = "Ambos"
-        else:
+        filtro_reg = registros[
+            (registros['NIT_PROVEEDOR'].str.contains(q_sin_espacios, na=False)) |
+            (registros['NOMBRE_PROVEEDOR'].str.contains(q_limpio, na=False))
+        ]
+        for _, row in filtro_reg.drop_duplicates(subset=['NIT_PROVEEDOR']).iterrows():
+            nit = row['NIT_PROVEEDOR']
             resultados_dict[nit] = {
                 "nit": nit,
-                "nombre": row['NOMBRE'],
-                "origen_dato": "Financiero",
-                "tipo_proveedor": "No especificado"
+                "nombre": row['NOMBRE_PROVEEDOR'],
+                "origen_dato": "Registro",
+                "tipo_proveedor": row['TIPO_PROVEEDOR']
             }
+
+        filtro_fin = financieras[
+            (financieras['NIT'].str.contains(q_sin_espacios, na=False)) |
+            (financieras['NOMBRE'].str.contains(q_limpio, na=False))
+        ]
+        for _, row in filtro_fin.drop_duplicates(subset=['NIT']).iterrows():
+            nit = row['NIT']
+            if nit in resultados_dict:
+                resultados_dict[nit]["origen_dato"] = "Ambos"
+            else:
+                resultados_dict[nit] = {
+                    "nit": nit,
+                    "nombre": row['NOMBRE'],
+                    "origen_dato": "Financiero",
+                    "tipo_proveedor": "No especificado"
+                }
+                
+    # Caso 2: Sin filtro -> Listar el catálogo completo
+    else:
+        # Agregar todas las del registro nacional
+        for _, row in registros.drop_duplicates(subset=['NIT_PROVEEDOR']).iterrows():
+            nit = row['NIT_PROVEEDOR']
+            if pd.notna(nit) and str(nit).strip() != "":
+                resultados_dict[nit] = {
+                    "nit": nit,
+                    "nombre": row['NOMBRE_PROVEEDOR'],
+                    "origen_dato": "Registro",
+                    "tipo_proveedor": row['TIPO_PROVEEDOR']
+                }
+        # Cruzar con todas las del reporte financiero
+        for _, row in financieras.drop_duplicates(subset=['NIT']).iterrows():
+            nit = row['NIT']
+            if pd.notna(nit) and str(nit).strip() != "":
+                if nit in resultados_dict:
+                    resultados_dict[nit]["origen_dato"] = "Ambos"
+                else:
+                    resultados_dict[nit] = {
+                        "nit": nit,
+                        "nombre": row['NOMBRE'],
+                        "origen_dato": "Financiero",
+                        "tipo_proveedor": "No especificado"
+                    }
             
     if not resultados_dict:
-        raise HTTPException(status_code=404, detail="No se encontraron empresas.")
+        raise HTTPException(status_code=404, detail="No se encontraron registros de empresas en la base de datos.")
+        
     return list(resultados_dict.values())
 
 @app.get("/api/v1/analizar/{nit}", response_model=RiskAnalysisResponse)
