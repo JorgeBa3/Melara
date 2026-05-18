@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoría Anti-Empresas de Cartón</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <header class="mb-10 text-center md:text-left border-b border-slate-800 pb-6">
+            <h1 class="text-3xl font-extrabold text-white flex items-center justify-center md:justify-start gap-3">
+                <i data-lucide="shield-alert" class="text-amber-500 w-8 h-8"></i>
+                Detector de Empresas de Cartón
+            </h1>
+            <p class="text-slate-400 mt-2">Módulo de análisis preventivo de riesgos en contratación pública.</p>
+        </header>
+
+        <section class="bg-slate-800 rounded-xl p-6 shadow-xl mb-8 border border-slate-700">
+            <h2 class="text-xl font-bold text-slate-200 mb-4 flex items-center gap-2">
+                <i data-lucide="search" class="w-5 h-5 text-indigo-400"></i>
+                Buscar Empresa Proveedora
+            </h2>
+            <form id="searchForm" class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1">
+                    <input 
+                        type="text" 
+                        id="searchQuery" 
+                        placeholder="Ingresa el NIT o el nombre de la empresa..." 
+                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+                        required
+                        minlength="3"
+                    >
+                </div>
+                <button 
+                    type="submit" 
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/40"
+                >
+                    <span id="btnText">Buscar</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </form>
+            <p id="searchError" class="text-red-400 mt-3 text-sm hidden flex items-center gap-1">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i> <span id="errorText"></span>
+            </p>
+        </section>
+
+        <section id="resultsSection" class="bg-slate-800 rounded-xl p-6 shadow-xl mb-8 border border-slate-700 hidden">
+            <h3 class="text-lg font-bold text-slate-300 mb-3 flex items-center gap-2">
+                <i data-lucide="list" class="w-5 h-5 text-emerald-400"></i>
+                Coincidencias Encontradas
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400 text-sm">
+                            <th class="py-3 px-4">NIT</th>
+                            <th class="py-3 px-4">Nombre / Razón Social</th>
+                            <th class="py-3 px-4">Tipo</th>
+                            <th class="py-3 px-4 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody" class="divide-y divide-slate-700/50 text-sm">
+                        </tbody>
+                </table>
+            </div>
+        </section>
+
+        <main id="analysisSection" class="grid grid-cols-1 md:grid-cols-3 gap-6 hidden">
+            
+            <div class="md:col-span-1 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl flex flex-col justify-between">
+                <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Resultado del Score</span>
+                    <div class="mt-4 flex flex-col items-center py-6 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                        <div id="riskBadge" class="text-5xl font-black px-6 py-3 rounded-xl mb-2 tracking-tight">0</div>
+                        <span id="riskLevelLabel" class="font-bold text-sm tracking-widest uppercase">Evaluando...</span>
+                    </div>
+                </div>
+
+                <div class="mt-6 border-t border-slate-700 pt-4">
+                    <h4 class="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Métricas Financieras</h4>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center bg-slate-900/30 p-2 rounded">
+                            <span class="text-xs text-slate-400">Total Adjudicado:</span>
+                            <span id="metaMonto" class="font-mono text-sm text-white font-bold">Q0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-slate-900/30 p-2 rounded">
+                            <span class="text-xs text-slate-400">No. Contratos:</span>
+                            <span id="metaContratos" class="font-mono text-sm text-indigo-400 font-bold">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="md:col-span-2 bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl space-y-6">
+                <div>
+                    <h3 id="companyName" class="text-2xl font-bold text-white leading-tight">Nombre de la Empresa</h3>
+                    <p class="text-slate-400 text-sm mt-1 flex items-center gap-4">
+                        <span><strong>NIT:</strong> <span id="companyNit" class="font-mono text-slate-300"></span></span>
+                        <span>•</span>
+                        <span><strong>Tipo:</strong> <span id="companyType" class="text-slate-300"></span></span>
+                    </p>
+                    <p class="text-xs text-slate-500 mt-2">
+                        <strong>Capacidad Económica Registrada:</strong> <span id="companyCapacity" class="italic"></span>
+                    </p>
+                </div>
+
+                <div class="border-t border-slate-700 pt-4">
+                    <h4 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                        <i data-lucide="flag" class="w-4 h-4 text-red-400"></i>
+                        Alertas Rojas Activadas (<span id="alertCount">0</span>)
+                    </h4>
+                    <ul id="alertsList" class="space-y-2.5">
+                        </ul>
+                </div>
+
+                <div id="technicalAnalysisBlock" class="border-t border-slate-700 pt-4">
+                    <h4 class="text-sm font-bold text-slate-300 mb-2">Desglose Técnico de Hallazgos</h4>
+                    <div id="technicalDetails" class="space-y-2 text-xs text-slate-400 bg-slate-900 p-4 rounded-lg font-mono">
+                        </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Cambia esto a la URL de producción si no usas Localhost
+        const API_BASE_URL = "http://localhost:8000/api/v1";
+
+        document.getElementById('searchForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const query = document.getElementById('searchQuery').value;
+            const searchError = document.getElementById('searchError');
+            const resultsSection = document.getElementById('resultsSection');
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const analysisSection = document.getElementById('analysisSection');
+
+            // Reset de vistas
+            searchError.classList.add('hidden');
+            analysisSection.classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/buscar?query=${encodeURIComponent(query)}`);
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.detail || "Error en la búsqueda");
+                }
+                
+                const data = await response.json();
+                resultsTableBody.innerHTML = '';
+                
+                data.forEach(empresa => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-700/30 transition-colors";
+                    tr.innerHTML = `
+                        <td class="py-3 px-4 font-mono font-bold text-indigo-400">${empresa.nit}</td>
+                        <td class="py-3 px-4 text-slate-200 font-medium">${empresa.nombre}</td>
+                        <td class="py-3 px-4 text-slate-400 text-xs">${empresa.tipo_proveedor}</td>
+                        <td class="py-3 px-4 text-right">
+                            <button onclick="ejecutarAuditoria('${empresa.nit}')" class="bg-slate-700 hover:bg-indigo-600 text-white text-xs font-bold px-3 py-1.5 rounded transition-all">
+                                Analizar Riesgo
+                            </button>
+                        </td>
+                    `;
+                    resultsTableBody.appendChild(tr);
+                });
+                
+                resultsSection.classList.remove('hidden');
+            } catch (err) {
+                resultsSection.classList.add('hidden');
+                document.getElementById('errorText').innerText = err.message;
+                searchError.classList.remove('hidden');
+            }
+        });
+
+        async function ejecutarAuditoria(nit) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/analizar/${nit}`);
+                if (!response.ok) throw new Error("No se pudo obtener el perfil de riesgo corporativo.");
+                
+                const data = await response.json();
+                renderizarAuditoria(data);
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        function renderizarAuditoria(data) {
+            const analysisSection = document.getElementById('analysisSection');
+            
+            // Llenar datos textuales
+            document.getElementById('companyName').innerText = data.nombre;
+            document.getElementById('companyNit').innerText = data.nit;
+            document.getElementById('companyType').innerText = data.tipo_provider || data.tipo_proveedor;
+            document.getElementById('companyCapacity').innerText = data.capacidad_economica_registrada;
+            
+            // Formatear Moneda local Quetzales (asumiendo datos de GT)
+            document.getElementById('metaMonto').innerText = new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(data.monto_adjudicado_total);
+            document.getElementById('metaContratos').innerText = data.cantidad_contratos;
+
+            // Renderizado del Termómetro de Score
+            const badge = document.getElementById('riskBadge');
+            const label = document.getElementById('riskLevelLabel');
+            badge.innerText = Math.round(data.score_riesgo);
+            
+            // Remover clases de color anteriores
+            badge.className = "text-5xl font-black px-6 py-3 rounded-xl mb-2 tracking-tight ";
+            label.className = "font-bold text-sm tracking-widest uppercase ";
+
+            if (data.nivel_riesgo === "CRÍTICO") {
+                badge.classList.add("bg-red-500/20", "text-red-400", "border", "border-red-500/50");
+                label.classList.add("text-red-400");
+            } else if (data.nivel_riesgo === "ALTO") {
+                badge.classList.add("bg-orange-500/20", "text-orange-400", "border", "border-orange-500/50");
+                label.classList.add("text-orange-400");
+            } else if (data.nivel_riesgo === "MEDIO") {
+                badge.classList.add("bg-yellow-500/20", "text-yellow-400", "border", "border-yellow-500/50");
+                label.classList.add("text-yellow-400");
+            } else {
+                badge.classList.add("bg-emerald-500/20", "text-emerald-400", "border", "border-emerald-500/50");
+                label.classList.add("text-emerald-400");
+            }
+            label.innerText = data.nivel_riesgo;
+
+            // Lista de Alertas Red Flags
+            const listContainer = document.getElementById('alertsList');
+            document.getElementById('alertCount').innerText = data.alertas_activadas.length;
+            listContainer.innerHTML = '';
+
+            if (data.alertas_activadas.length === 0) {
+                listContainer.innerHTML = `<li class="text-emerald-400 text-sm flex items-center gap-2 bg-emerald-950/30 p-3 rounded-lg border border-emerald-900/40">
+                    <i data-lucide="check-circle" class="w-4 h-4"></i> No se detectaron comportamientos anómalos o de simulación contractual en este periodo.
+                </li>`;
+            } else {
+                data.alertas_activadas.forEach(alerta => {
+                    const li = document.createElement('li');
+                    li.className = "text-red-300 text-sm flex items-start gap-2 bg-red-950/20 p-3 rounded-lg border border-red-900/40";
+                    li.innerHTML = `<i data-lucide="octagon-alert" class="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0"></i> <span>${alerta}</span>`;
+                    listContainer.appendChild(li);
+                });
+            }
+
+            // Desglose Técnico
+            const detailsContainer = document.getElementById('technicalDetails');
+            detailsContainer.innerHTML = '';
+            if (Object.keys(data.detalles_analisis).length === 0) {
+                detailsContainer.innerHTML = '<span class="text-slate-500">Sin observaciones especiales agregadas por el motor algorítmico.</span>';
+            } else {
+                for (const [clave, valor] of Object.entries(data.detalles_analisis)) {
+                    const div = document.createElement('div');
+                    div.className = "mb-2";
+                    div.innerHTML = `<span class="text-indigo-400 font-bold">[${clave.toUpperCase()}]:</span> <span class="text-slate-300">${valor}</span>`;
+                    detailsContainer.appendChild(div);
+                }
+            }
+
+            // Mostrar el contenedor global
+            analysisSection.classList.remove('hidden');
+            // Refrescar iconos inyectados dinámicamente
+            lucide.createIcons();
+            
+            // Scroll suave hacia abajo para ver el análisis
+            analysisSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Inicializar iconos estáticos al cargar la página
+        lucide.createIcons();
+    </script>
+</body>
+</html>
